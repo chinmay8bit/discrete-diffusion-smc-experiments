@@ -3,7 +3,7 @@ from torch import Tensor
 import torch.nn.functional as F
 
 
-def subs_parametrization(self, logits: Tensor, x: Tensor) -> Tensor:
+def subs_parametrization(logits: Tensor, x: Tensor) -> Tensor:
     """
     logits: (B, L, num_categories)
     x: (B, L, num_categories)
@@ -23,7 +23,7 @@ def subs_parametrization(self, logits: Tensor, x: Tensor) -> Tensor:
     return new_probs
 
 
-def subs_parametrization_continuous(self, logits: Tensor, x: Tensor) -> Tensor:
+def subs_parametrization_continuous(logits: Tensor, x: Tensor) -> Tensor:
     """
     logits: (B, L, num_categories)
     x: (B, L, num_categories)
@@ -43,5 +43,3 @@ def subs_parametrization_continuous(self, logits: Tensor, x: Tensor) -> Tensor:
         + x[:, :, :-1]
     )
     return new_probs
-
-

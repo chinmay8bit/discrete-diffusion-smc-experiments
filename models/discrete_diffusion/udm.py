@@ -1,16 +1,16 @@
 import torch
 from torch import nn, Tensor
 import torch.nn.functional as F
-from utils.schedulers import NoiseScheduler, DiscreteTimeScheduler
+from .utils.schedulers import NoiseScheduler, DiscreteTimeScheduler
 
 class UniformDiffusion(nn.Module):
-    EPSILON = 1e-6
+    EPSILON = 1e-8
     
     def __init__(
         self, 
         denoising_model: nn.Module, 
         input_shape: tuple,
-        vocab_size: int,
+        num_categories: int,
         noise_schedule:str = "linear",
         num_timesteps:int = 1000,
         discretization_schedule:str = "cosine"
@@ -18,7 +18,7 @@ class UniformDiffusion(nn.Module):
         super(UniformDiffusion, self).__init__()
         self.denoising_model = denoising_model
         self.input_shape = input_shape
-        self.vocab_size = vocab_size
+        self.num_categories = num_categories
         self.scheduler = NoiseScheduler(noise_schedule)
         self.num_timesteps = num_timesteps
         self.discrete_time_scheduler = DiscreteTimeScheduler(discretization_schedule, num_timesteps)
@@ -28,14 +28,13 @@ class UniformDiffusion(nn.Module):
         B = x.shape[0]
         x = x.reshape(B, -1)
         L = x.shape[-1]
-        N = self.vocab_size
+        N = self.num_categories
         
         u = torch.rand(1, device=x.device)
         t = torch.remainder(u + torch.arange(B, device=x.device)/B, 1) # Shape: (B)
-        t = torch.clamp(t + self.EPSILON, max=1) # The loss term is undefined for t = 0
         
         alpha = self.scheduler.alpha(t) # Shape: (B)
-        weight = self.scheduler.alpha_dash(t) / alpha # Shape: (B)
+        weight = self.scheduler.alpha_dash(t) / alpha.clamp(min=self.EPSILON) # Shape: (B)
     
         # 1. Sample z_t from q(z_t | x)
         x = F.one_hot(x, num_classes=N) # Shape: (B, L, N)
@@ -71,7 +70,7 @@ class UniformDiffusion(nn.Module):
         
         # 7. Calculate loss term 2
         loss_term_2 = (x_bar_j / x_bar_i) * torch.log(
-            (x_bar_j / x_bar_i) * (x_theta_bar_i / x_theta_bar_j)
+            ((x_bar_j / x_bar_i) * (x_theta_bar_i / x_theta_bar_j)).clamp(min=self.EPSILON)
         ) # Shape (B, L, N-1)
         loss_term_2 = - loss_term_2.sum(dim=-1).sum(dim=-1) # Shape: (B)
         
@@ -80,7 +79,7 @@ class UniformDiffusion(nn.Module):
         return loss.mean(dim=0)
     
     def sample(self, num_samples: int = 1, device='cpu') -> Tensor:
-        N = self.vocab_size
+        N = self.num_categories
         z_t = torch.randint(0, N, (num_samples, *self.input_shape), device=device)
         B = z_t.shape[0]
         z_t = z_t.reshape(B, -1) # Shape: (B, L)
@@ -106,7 +105,7 @@ class UniformDiffusion(nn.Module):
         alpha_s = self.scheduler.alpha(s)
         
         # 1. Calculate x_theta
-        x_theta = self.denoising_model(
+        x_theta: Tensor = self.denoising_model(
             z_t.reshape(B, *self.input_shape, N), 
             torch.full((B,), t, device=device)
         )
@@ -127,9 +126,9 @@ class UniformDiffusion(nn.Module):
             )
         
         # Sanity check - probabilities should sum up to 1
-        assert torch.allclose(p_theta.sum(dim=-1), torch.ones(B, L, device=device)), f"Max = {torch.abs(p_theta.sum(dim=-1) - torch.ones(B, L, device=device)).max()}"
-        assert torch.allclose(x_theta.sum(dim=-1), torch.ones(B, L, device=device)), f"Max = {torch.abs(x_theta.sum(dim=-1) - torch.ones(B, L, device=device)).max()}"
+        assert torch.allclose(x_theta.sum(dim=-1), torch.ones(B, L, device=device)), f"Max = {torch.abs(x_theta.sum(dim=-1) - torch.ones(B, L, device=device)).max()}, {i}"
+        assert torch.allclose(p_theta.sum(dim=-1), torch.ones(B, L, device=device)), f"Max = {torch.abs(p_theta.sum(dim=-1) - torch.ones(B, L, device=device)).max()}, {i}"
         # Sanity check - probabilities should be non-negative
-        assert torch.all(p_theta >= 0), f"Min = {p_theta.min()}, {t}"
-        assert torch.all(x_theta >= 0), f"Min = {x_theta.min()}, {t}"
+        assert torch.all(x_theta >= 0), f"Min = {x_theta.min()}, {i}"
+        assert torch.all(p_theta >= 0), f"Min = {p_theta.min()}, {i}"
         return p_theta, x_theta

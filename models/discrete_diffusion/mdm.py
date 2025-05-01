@@ -1,7 +1,7 @@
 import torch
 from torch import nn, Tensor
 import torch.nn.functional as F
-from utils.schedulers import NoiseScheduler, DiscreteTimeScheduler
+from .utils.schedulers import NoiseScheduler, DiscreteTimeScheduler
 
 
 class MaskedDiffusion(nn.Module):
