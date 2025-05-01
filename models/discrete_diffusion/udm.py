@@ -70,7 +70,7 @@ class UniformDiffusion(nn.Module):
         
         # 7. Calculate loss term 2
         loss_term_2 = (x_bar_j / x_bar_i) * torch.log(
-            ((x_bar_j / x_bar_i) * (x_theta_bar_i / x_theta_bar_j)).clamp(min=self.EPSILON)
+            (x_bar_j / x_bar_i).clamp(min=self.EPSILON) * (x_theta_bar_i / x_theta_bar_j)
         ) # Shape (B, L, N-1)
         loss_term_2 = - loss_term_2.sum(dim=-1).sum(dim=-1) # Shape: (B)
         
