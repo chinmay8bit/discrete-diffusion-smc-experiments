@@ -48,35 +48,39 @@ def sequential_monte_carlo(
     # Initialize particles at time T
     X_t = intialize_particles_fn(N, device=device)
     log_W_t = torch.zeros(N, device=device, requires_grad=False)
+    input_shape = X_t.shape[1:]
     
-    log_prob_diffusion = torch.zeros(N).to(device)
-    log_prob_proposal = torch.zeros(N).to(device)
-    log_twist_func_prev = torch.zeros(N).to(device)
+    log_prob_diffusion = torch.zeros(N, device=device, requires_grad=False)
+    log_prob_proposal = torch.zeros(N, device=device, requires_grad=False)
+    log_twist_func_prev = torch.zeros(N, device=device, requires_grad=False)
     
     particles_trace = [X_t.cpu().numpy()]
     log_weights_trace = []
     ess_trace = []
     rewards_trace = []
-    resample_count = 0
+    resampling_trace = []
     
     for t in tqdm(range(T, 0, -1)):
         # Compute rewards and rewards grad
-        z_t = F.one_hot(X_t, num_classes=num_categories).float()
+        z_t = F.one_hot(X_t.reshape(N, -1), num_classes=num_categories).float()
         z_t.requires_grad_()
-        x_s_probs, x0_probs = model.sample_step(z_t, t, device=device)
+        x_s_probs, x0_probs = model.sample_step(z_t, t, device=device) # Shape: N, L, num_categories
         x0_samples = F.gumbel_softmax(
             logits=torch.log(x0_probs + eps).unsqueeze(1).expand(-1, reward_estimate_sample_count, -1, -1),
             hard=True,
-        )
-        rewards = compute_reward_fn(x0_samples.reshape(N * reward_estimate_sample_count, 2, num_categories)).reshape(N, reward_estimate_sample_count)
-        rewards = rewards.mean(dim=1)
+        ) # Shape: N, reward_estimate_sample_count, L, num_categories
+        rewards = compute_reward_fn(
+            x0_samples.reshape(N * reward_estimate_sample_count, *input_shape, num_categories),
+            with_grad=True,
+        ).reshape(N, reward_estimate_sample_count)
+        rewards = rewards.mean(dim=1) # Shape: N
         rewards_grad = torch.autograd.grad(outputs=rewards, inputs=z_t, grad_outputs=torch.ones_like(rewards))[0]
         
         # After computing gradients, detach and other tensors if needed
         x_s_probs = x_s_probs.detach()
         rewards = rewards.detach()
         
-        rewards_trace.append(rewards.cpu())
+        rewards_trace.append(rewards.cpu().numpy())
         
         log_twist_func = (lambdas[t] / kl_weight) * rewards
         
@@ -103,22 +107,22 @@ def sequential_monte_carlo(
             rewards_grad = rewards_grad[resampled_indices]
             if verbose:
                 print(f"Resampled at step {t}")
-            resample_count += 1
+            resampling_trace.append(t)
 
         
         # Update particles using proposal
-        X_t, log_prob_proposal = proposal_fn(X_t, x_s_probs, t, lambdas, kl_weight, rewards_grad, model, mask_token, reward_estimate_sample_count)
+        X_t, log_prob_proposal = proposal_fn(X_t, x_s_probs, t, lambdas, kl_weight, rewards_grad, model, reward_estimate_sample_count)
         particles_trace.append(X_t.cpu().numpy())
         
         diffusion_distribution = torch.distributions.Categorical(probs=x_s_probs)
-        log_prob_diffusion = diffusion_distribution.log_prob(X_t).sum(dim=1)
+        log_prob_diffusion = diffusion_distribution.log_prob(X_t.reshape(N, -1)).sum(dim=1)
         
         # assert torch.allclose(log_prob_diffusion, log_prob_proposal), "Log probabilities do not match"
         
         log_twist_func_prev = log_twist_func
     
     final_rewards = compute_reward_fn(F.one_hot(X_t, num_classes=num_categories).float())
-    rewards_trace.append(final_rewards.cpu())
+    rewards_trace.append(final_rewards.cpu().numpy())
     log_twist_func = (lambdas[0] / kl_weight) * final_rewards
     # Update weights
     log_W_t += (
@@ -127,12 +131,13 @@ def sequential_monte_carlo(
     )
     log_W_t = normalize_log_weights(log_W_t)
     log_weights_trace.append(log_W_t.cpu().numpy())
+    ess_trace.append(compute_ess_from_log_w(log_W_t).item())
 
     # Final resampling to get uniform weights
     resampled_indices = resample_fn(log_W_t)
     X_t = X_t[resampled_indices]
     log_W_t = torch.zeros_like(log_W_t)
     
-    print(f"Resampled {resample_count} times.")
+    print(f"Resampled {len(resampling_trace)} times.")
 
-    return X_t, normalize_weights(log_W_t), ess_trace, rewards_trace, particles_trace, log_weights_trace
+    return X_t, normalize_weights(log_W_t), ess_trace, rewards_trace, particles_trace, log_weights_trace, resampling_trace
