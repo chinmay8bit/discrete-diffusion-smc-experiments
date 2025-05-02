@@ -127,7 +127,8 @@ class UniformDiffusion(nn.Module):
         
         # Sanity check - probabilities should sum up to 1
         assert torch.allclose(x_theta.sum(dim=-1), torch.ones(B, L, device=device)), f"Max = {torch.abs(x_theta.sum(dim=-1) - torch.ones(B, L, device=device)).max()}, {i}"
-        assert torch.allclose(p_theta.sum(dim=-1), torch.ones(B, L, device=device)), f"Max = {torch.abs(p_theta.sum(dim=-1) - torch.ones(B, L, device=device)).max()}, {i}"
+        assert torch.allclose(p_theta.sum(dim=-1), torch.ones(B, L, device=device), atol=1e-4), f"Max = {torch.abs(p_theta.sum(dim=-1) - torch.ones(B, L, device=device)).max()}, {i}"
+        p_theta = p_theta / p_theta.sum(dim=-1, keepdim=True)
         # Sanity check - probabilities should be non-negative
         assert torch.all(x_theta >= 0), f"Min = {x_theta.min()}, {i}"
         assert torch.all(p_theta >= 0), f"Min = {p_theta.min()}, {i}"

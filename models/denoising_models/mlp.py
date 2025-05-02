@@ -2,6 +2,8 @@ import torch
 from torch import nn
 from torch import Tensor
 from typing import Callable
+from .utils.time_embeddings import SinusoidalPosEmb
+
 
 class MLP(nn.Module):
     def __init__(
@@ -25,12 +27,8 @@ class MLP(nn.Module):
         for s in input_shape:
             L *= s
         
-        input_dim = L * embed_dim
-        if encode_time:
-            input_dim += 1
-        
         self.mlp = nn.Sequential(
-            nn.Linear(input_dim, hidden_dim),
+            nn.Linear(L * embed_dim, hidden_dim),
             nn.ReLU(),
             *[
                 nn.Sequential(
@@ -41,6 +39,14 @@ class MLP(nn.Module):
             ],
             nn.Linear(hidden_dim, L * num_categories),
         )
+        
+        if self.encode_time:
+            self.time_mlp = nn.Sequential(
+                SinusoidalPosEmb(embed_dim),
+                nn.Linear(embed_dim, embed_dim),
+                nn.GELU(),
+                nn.Linear(embed_dim, 2 * embed_dim),
+            )
         
     def forward(self, x: Tensor, t: Tensor) -> Tensor:
         """
@@ -56,9 +62,11 @@ class MLP(nn.Module):
         x_emb = x @ self.embedding.weight # Shape: (B, L, embed_dim)
         
         if self.encode_time:
-            mlp_input = torch.cat([x_emb.flatten(start_dim=1), t.unsqueeze(1)], dim=1)
-        else:
-            mlp_input = x_emb.flatten(start_dim=1)
+            t_emb = self.time_mlp(t) # Shape: (B, 2 * embed_dim)
+            t_scale, t_shift = torch.chunk(t_emb, 2, dim=-1)
+            x_emb = x_emb * t_scale[:, None, :] + t_shift[:, None, :]
+        
+        mlp_input = x_emb.flatten(start_dim=1)
         logits: Tensor = self.mlp(mlp_input).reshape(B, L, self.num_categories)
         
         probs = self.probs_parametrization_fn(logits, x)
