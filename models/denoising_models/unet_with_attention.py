@@ -138,6 +138,7 @@ class UNetWithAttention(nn.Module):
         attention_resolutions=(2, 4), 
         dropout=0.0, 
         resamp_with_conv=True,
+        encode_time: bool = True,
         probs_parametrization_fn: Callable[[Tensor, Tensor], Tensor] = lambda logits, x: torch.softmax(logits, dim=-1),
     ):
         """
@@ -152,6 +153,7 @@ class UNetWithAttention(nn.Module):
             probs_parametrization_fn: Function mapping logits and input to probabilities.
         """
         super(UNetWithAttention, self).__init__()
+        self.encode_time = encode_time
         self.probs_parametrization_fn = probs_parametrization_fn
             
         self.embedding = nn.Embedding(num_categories, embedding_dim)
@@ -282,6 +284,9 @@ class UNetWithAttention(nn.Module):
         x: (B, C, H, W, num_categories)
         t: (B,)
         """
+        if not self.encode_time:
+            t = t * 0
+        
         logits = self._forward(x, t) # Shape: (B, C, H, W, num_categories)
         B, C, H, W, num_categories = logits.shape
         logits = logits.reshape(B, -1, num_categories)
