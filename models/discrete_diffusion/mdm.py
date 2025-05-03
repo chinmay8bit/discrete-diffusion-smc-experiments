@@ -5,6 +5,8 @@ from .utils.schedulers import NoiseScheduler, DiscreteTimeScheduler
 
 
 class MaskedDiffusion(nn.Module):
+    EPSILON = 1e-8
+    
     def __init__(
         self, 
         denoising_model: nn.Module, 
@@ -35,7 +37,7 @@ class MaskedDiffusion(nn.Module):
         t = torch.remainder(u + torch.arange(B, device=x.device)/B, 1) # Shape: (B)
         
         alpha = self.scheduler.alpha(t) # Shape: (B)
-        weight = self.scheduler.alpha_dash(t) / (1 - alpha) # Shape: (B)
+        weight = self.scheduler.alpha_dash(t) / (1 - alpha).clamp(min=self.EPSILON) # Shape: (B)
         
         # 1. Sample z_t from q(z_t | x)
         x = F.one_hot(x, num_classes=N) # Shape: (B, L, N)
