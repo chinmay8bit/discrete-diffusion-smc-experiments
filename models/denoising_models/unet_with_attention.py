@@ -140,6 +140,17 @@ class UNetWithAttention(nn.Module):
         resamp_with_conv=True,
         probs_parametrization_fn: Callable[[Tensor, Tensor], Tensor] = lambda logits, x: torch.softmax(logits, dim=-1),
     ):
+        """
+        Args:
+            num_categories: Number of discrete categories for output channels.
+            embedding_dim: Base channel multiplier.
+            ch_mult: Channel multipliers per resolution level.
+            num_res_blocks: Blocks per resolution.
+            attention_resolutions: Levels at which to apply attention.
+            dropout: Dropout rate in ResNet blocks.
+            resamp_with_conv: Use conv layers for up/down sampling.
+            probs_parametrization_fn: Function mapping logits and input to probabilities.
+        """
         super(UNetWithAttention, self).__init__()
         self.probs_parametrization_fn = probs_parametrization_fn
             
