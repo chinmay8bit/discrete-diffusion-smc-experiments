@@ -17,7 +17,7 @@ class Binarize(object):
         return (img > self.threshold).float()
 
 
-def build_dataloaders(batch_size: int = 64):
+def build_dataloaders(batch_size: int = 64, shuffle_train=True):
     # Compose transforms: binarize after resizing
     transform = transforms.Compose([
         Binarize(threshold=0.5),
@@ -28,6 +28,6 @@ def build_dataloaders(batch_size: int = 64):
     test_dataset  = datasets.MNIST(root=data_path, train=False, download=True, transform=transform)
 
     # Create DataLoaders
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=shuffle_train)
     test_loader  = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
     return train_loader, test_loader
