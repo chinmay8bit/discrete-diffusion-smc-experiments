@@ -206,7 +206,7 @@ def binarized_images_diversity(imgs):
             count += 1
 
     val = total / count if count > 0 else 0.0
-    return val
+    return val * 100
 
 
 def plot_smc_results_binarized_mnist(
@@ -333,5 +333,5 @@ def plot_smc_results_binarized_mnist(
     final_uniqueness = np.unique(samples_final, axis=0).shape[0]
     final_diversity = diversity_score_fn(samples_final)
     print(f"Final average reward: {avg_reward:.4f}")
-    print(f"Final diversity score: {final_diversity}")
+    print(f"Final diversity score: {final_diversity:.2f}")
     print(f"Final uniqueness: {final_uniqueness}")
