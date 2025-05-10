@@ -4,6 +4,7 @@ import matplotlib.colors as mcolors
 import torch
 import torch.nn.functional as F
 from typing import Callable
+from scipy.stats import wasserstein_distance_nd as WD
 
 def plot_smc_results_checkerboard(
     X_0: torch.Tensor,
@@ -18,6 +19,7 @@ def plot_smc_results_checkerboard(
     num_categories: int,
     compute_rewards_fn: Callable[[torch.Tensor], torch.Tensor],
     interval=None,
+    target_samples=None,
 ) -> None:
     """
     Visualize the progression and diagnostics of a Sequential Monte Carlo (SMC) run.
@@ -136,6 +138,16 @@ def plot_smc_results_checkerboard(
     final_diversity = np.unique(samples_final, axis=0).shape[0]
     print(f"Final average reward: {avg_reward:.4f}")
     print(f"Final diversity: {final_diversity}")
+    if target_samples is not None:
+        print(f"EMD: {calculate_EMD(samples_final, target_samples)}")
+  
+    
+def calculate_EMD(samples, target_samples):
+    emd = WD(
+        samples[np.random.choice(np.arange(len(samples)), 500)], 
+        target_samples[np.random.choice(np.arange(len(target_samples)), 500)]
+    )
+    return emd
 
 
 def show_binarized_images_with_rewards(imgs, rewards, log_weights, title=None):
