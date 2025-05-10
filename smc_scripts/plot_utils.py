@@ -17,7 +17,7 @@ def plot_smc_results_checkerboard(
     vocab_size: int,
     num_categories: int,
     compute_rewards_fn: Callable[[torch.Tensor], torch.Tensor],
-    interval: int = 100
+    interval=None,
 ) -> None:
     """
     Visualize the progression and diagnostics of a Sequential Monte Carlo (SMC) run.
@@ -57,6 +57,9 @@ def plot_smc_results_checkerboard(
     -------
     None
     """
+    if interval is None:
+        interval = num_timesteps // 10
+    
     # Compute sample diversity (# unique particles) at each time step
     diversity_trace = [
         np.unique(particles_trace[i], axis=0).shape[0]

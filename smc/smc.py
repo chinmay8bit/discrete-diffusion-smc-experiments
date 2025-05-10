@@ -21,6 +21,7 @@ def sequential_monte_carlo(
     lambdas,
     kl_weight,
     reward_estimate_sample_count=None,
+    perform_final_resample=True,
     eps=1e-9,
     device='cpu',
     verbose=False,
@@ -134,9 +135,10 @@ def sequential_monte_carlo(
     ess_trace.append(compute_ess_from_log_w(log_W_t).item())
 
     # Final resampling to get uniform weights
-    resampled_indices = resample_fn(log_W_t)
-    X_t = X_t[resampled_indices]
-    log_W_t = torch.zeros_like(log_W_t)
+    if perform_final_resample:
+        resampled_indices = resample_fn(log_W_t)
+        X_t = X_t[resampled_indices]
+        log_W_t = torch.zeros_like(log_W_t)
     
     print(f"Resampled {len(resampling_trace)} times.")
 
