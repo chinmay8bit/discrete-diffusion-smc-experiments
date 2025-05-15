@@ -11,17 +11,35 @@ class Binarize(object):
         self.threshold = threshold
 
     def __call__(self, img):
-        # Convert to tensor (if not already)
-        img = transforms.ToTensor()(img)
         # Binarize using the threshold
-        return (img > self.threshold).float()
+        return (img > self.threshold)
+
+class BernoulliNoise(object):
+    def __init__(self, p=0.1):
+        self.p = p
+        
+    def __call__(self, img):
+        # Flip each binary pixel with probability p
+        return torch.where(torch.rand_like(img, dtype=torch.float) < self.p, torch.logical_not(img), img)
+
+class TransformToFloat(object):
+    def __init__(self):
+        pass
+    
+    def __call__(self, img):
+        return img.float()
 
 
-def build_dataloaders(batch_size: int = 64, shuffle_train=True):
+def build_dataloaders(batch_size: int = 64, shuffle_train=True, add_noise=False):
     # Compose transforms: binarize after resizing
-    transform = transforms.Compose([
+    transformations = [
+        transforms.ToTensor(),
         Binarize(threshold=0.5),
-    ])
+    ]
+    if add_noise:
+        transformations.append(BernoulliNoise(p=0.1))
+    transformations.append(TransformToFloat())
+    transform = transforms.Compose(transformations)
 
     # Load MNIST training and test datasets with the binary transform
     train_dataset = datasets.MNIST(root=data_path, train=True, download=True, transform=transform)
