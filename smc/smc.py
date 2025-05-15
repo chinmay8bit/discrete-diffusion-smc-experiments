@@ -6,6 +6,7 @@ from .utils import (
     normalize_log_weights, 
     normalize_weights
 )
+from .sampling_algorithms import partial_resample
 
 
 def sequential_monte_carlo(
@@ -20,10 +21,11 @@ def sequential_monte_carlo(
     compute_reward_fn,
     lambdas,
     kl_weight,
-    reward_estimate_sample_count=None,
+    reward_estimate_sample_count: int,
+    use_partial_resampling: bool = False,
     perform_final_resample=True,
     eps=1e-9,
-    device='cpu',
+    device=torch.device('cpu'),
     verbose=False,
 ):
     """
@@ -100,9 +102,12 @@ def sequential_monte_carlo(
         ESS = compute_ess_from_log_w(log_W_t)
         ess_trace.append(ESS.item())
         if ESS < ESS_min:
-            resampled_indices = resample_fn(log_W_t)
+            if use_partial_resampling:
+                resampled_indices, log_W_t = partial_resample(log_W_t, resample_fn, N // 2)
+            else:
+                resampled_indices = resample_fn(log_W_t)
+                log_W_t = log_W_t.zero_()
             X_t = X_t[resampled_indices]
-            log_W_t = log_W_t.zero_()
             x_s_probs = x_s_probs[resampled_indices]
             log_twist_func = log_twist_func[resampled_indices]
             rewards_grad = rewards_grad[resampled_indices]
