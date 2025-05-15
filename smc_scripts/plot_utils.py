@@ -5,6 +5,7 @@ import torch
 import torch.nn.functional as F
 from typing import Callable
 from scipy.stats import wasserstein_distance_nd as WD
+from smc_scripts.binarized_mnist_utils import binarized_images_diversity, binarized_images_uniqueness_score
 
 def plot_smc_results_checkerboard(
     X_0: torch.Tensor,
@@ -179,7 +180,7 @@ def show_binarized_images_with_rewards(imgs, rewards, log_weights, title=None):
     cmap = mcolors.ListedColormap(['black', 'white', 'blue'])
     norm = mcolors.BoundaryNorm([-.5, .5, 1.5, 2.5], ncolors=3)
 
-    for i, ax in enumerate(axes):
+    for i, ax in enumerate(axes): # type: ignore
         img = imgs[i].squeeze(0)  # now shape (28,28)
         ax.imshow(img, cmap=cmap, norm=norm, interpolation='nearest')
         weight = np.exp(log_weights[i])
@@ -189,43 +190,9 @@ def show_binarized_images_with_rewards(imgs, rewards, log_weights, title=None):
     plt.tight_layout()
     plt.show()
 
-def binarized_images_diversity(imgs):
-    """
-    imgs: LongTensor of shape (B,1,28,28) with values {0,1,2}.
-          2 = masked (ignore).
-    returns: scalar—mean normalized Hamming distance over all image pairs.
-    """
-    imgs = torch.from_numpy(imgs)
-    B = imgs.size(0)
-    # flatten to (B, 28*28)
-    x = imgs.view(B, -1)
-    # mask where !=2
-    valid = (x != 2)  # (B, P)
-    
-    # preallocate
-    total = 0.0
-    count = 0
-
-    for i in range(B):
-        xi, mi = x[i], valid[i]
-        for j in range(i+1, B):
-            xj, mj = x[j], valid[j]
-            # only compare pixels both unmasked
-            both = mi & mj                  # (P,)
-            n = both.sum().item()
-            if n == 0:
-                continue  # no common pixels—skip
-            # XOR counts where bits differ
-            diffs = (xi[both] != xj[both]).sum().item()
-            total += diffs / n
-            count += 1
-
-    val = total / count if count > 0 else 0.0
-    return val * 100
-
 
 def plot_smc_results_binarized_mnist(
-    X_0: torch.Tensor,
+    X_0: torch.LongTensor,
     W_0: torch.Tensor,
     ess_trace: np.ndarray,
     rewards_trace: np.ndarray,
@@ -345,7 +312,8 @@ def plot_smc_results_binarized_mnist(
 
     # Compute final diversity and average reward
     avg_reward = rewards.mean().item()
-    final_uniqueness = np.unique(samples_final, axis=0).shape[0]
+    # final_uniqueness = np.unique(samples_final, axis=0).shape[0]
+    final_uniqueness = binarized_images_uniqueness_score(torch.LongTensor(samples_final), 0.75)
     final_diversity = diversity_score_fn(samples_final)
     print(f"Final average reward: {avg_reward:.4f}")
     print(f"Final diversity score: {final_diversity:.2f}")
