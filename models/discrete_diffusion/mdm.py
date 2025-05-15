@@ -60,7 +60,7 @@ class MaskedDiffusion(nn.Module):
         loss = weight * loss_terms.sum(dim=-1)
         return loss.mean(dim=0)
      
-    def sample(self, num_samples: int = 1, device='cpu') -> Tensor:
+    def sample(self, num_samples: int = 1, device=torch.device('cpu')) -> Tensor:
         N = self.num_categories
         z_t = torch.full((num_samples, *self.input_shape), self.mask_index, device=device)
         B = z_t.shape[0]
@@ -79,7 +79,7 @@ class MaskedDiffusion(nn.Module):
         assert torch.all(x != self.mask_index)
         return x
     
-    def sample_step(self, z_t: Tensor, i: int, device='cpu') -> tuple[Tensor, Tensor]:
+    def sample_step(self, z_t: Tensor, i: int, device=torch.device('cpu')) -> tuple[Tensor, Tensor]:
         B, L, N = z_t.shape
         
         t = self.discrete_time_scheduler.discrete_time(i).to(device)
@@ -90,7 +90,7 @@ class MaskedDiffusion(nn.Module):
         # 1. Calculate x_theta
         x_theta = self.denoising_model(
             z_t.reshape(B, *self.input_shape, N), 
-            torch.full((B,), t, device=device)
+            torch.full((B,), t.item(), device=device)
         )
         x_theta = x_theta.reshape(B, L, N)
 
