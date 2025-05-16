@@ -1,6 +1,7 @@
 from tqdm import tqdm
 import torch
 import torch.nn.functional as F
+from typing import Callable, Optional
 from .utils import (
     compute_ess_from_log_w,
     normalize_log_weights, 
@@ -13,7 +14,7 @@ def sequential_monte_carlo(
     model, 
     num_categories,
     T,
-    N, 
+    N: int, 
     ESS_min, 
     intialize_particles_fn,
     resample_fn, 
@@ -23,6 +24,7 @@ def sequential_monte_carlo(
     kl_weight,
     reward_estimate_sample_count: int,
     use_partial_resampling: bool = False,
+    partial_resample_size: Optional[int] = None,
     perform_final_resample=True,
     eps=1e-9,
     device=torch.device('cpu'),
@@ -62,6 +64,8 @@ def sequential_monte_carlo(
     ess_trace = []
     rewards_trace = []
     resampling_trace = []
+    log_prob_diffusion_trace = [log_prob_diffusion.cpu().numpy()]
+    log_prob_proposal_trace = [log_prob_proposal.cpu().numpy()]
     
     for t in tqdm(range(T, 0, -1)):
         # Compute rewards and rewards grad
@@ -103,7 +107,9 @@ def sequential_monte_carlo(
         ess_trace.append(ESS.item())
         if ESS < ESS_min:
             if use_partial_resampling:
-                resampled_indices, log_W_t = partial_resample(log_W_t, resample_fn, N // 2)
+                if partial_resample_size is None:
+                    partial_resample_size = N // 2
+                resampled_indices, log_W_t = partial_resample(log_W_t, resample_fn, partial_resample_size)
             else:
                 resampled_indices = resample_fn(log_W_t)
                 log_W_t = log_W_t.zero_()
@@ -124,6 +130,8 @@ def sequential_monte_carlo(
         log_prob_diffusion = diffusion_distribution.log_prob(X_t.reshape(N, -1)).sum(dim=1)
         
         # assert torch.allclose(log_prob_diffusion, log_prob_proposal), "Log probabilities do not match"
+        log_prob_diffusion_trace.append(log_prob_diffusion.cpu().numpy())
+        log_prob_proposal_trace.append(log_prob_proposal.cpu().numpy())
         
         log_twist_func_prev = log_twist_func
     
@@ -144,7 +152,21 @@ def sequential_monte_carlo(
         resampled_indices = resample_fn(log_W_t)
         X_t = X_t[resampled_indices]
         log_W_t = torch.zeros_like(log_W_t)
+        if verbose:
+            print(f"Resampled at step {0}")
+        resampling_trace.append(0)
     
     print(f"Resampled {len(resampling_trace)} times.")
 
-    return X_t, normalize_weights(log_W_t), ess_trace, rewards_trace, particles_trace, log_weights_trace, resampling_trace
+    return {
+        "X_0": X_t,
+        "W_0": normalize_weights(log_W_t),
+        "ess_trace": ess_trace,
+        "rewards_trace": rewards_trace,
+        "particles_trace": particles_trace,
+        "log_weights_trace": log_weights_trace,
+        "resampling_trace": resampling_trace,   
+        "log_prob_diffusion_trace": log_prob_diffusion_trace,
+        "log_prob_proposal_trace": log_prob_proposal_trace
+    }
+
