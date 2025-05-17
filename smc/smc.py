@@ -1,5 +1,6 @@
 from tqdm import tqdm
 import torch
+import numpy as np
 import torch.nn.functional as F
 from typing import Callable, Optional
 from .utils import (
@@ -66,6 +67,7 @@ def sequential_monte_carlo(
     resampling_trace = []
     log_prob_diffusion_trace = [log_prob_diffusion.cpu().numpy()]
     log_prob_proposal_trace = [log_prob_proposal.cpu().numpy()]
+    parent_trace = []
     
     for t in tqdm(range(T, 0, -1)):
         # Compute rewards and rewards grad
@@ -120,6 +122,9 @@ def sequential_monte_carlo(
             if verbose:
                 print(f"Resampled at step {t}")
             resampling_trace.append(t)
+            parent_trace.append(resampled_indices.cpu().numpy())
+        else:
+            parent_trace.append(np.arange(N).astype(int))
 
         
         # Update particles using proposal
@@ -167,6 +172,7 @@ def sequential_monte_carlo(
         "log_weights_trace": log_weights_trace,
         "resampling_trace": resampling_trace,   
         "log_prob_diffusion_trace": log_prob_diffusion_trace,
-        "log_prob_proposal_trace": log_prob_proposal_trace
+        "log_prob_proposal_trace": log_prob_proposal_trace,
+        "parent_trace": parent_trace,
     }
 
