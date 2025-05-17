@@ -184,7 +184,7 @@ def show_binarized_images_with_rewards(imgs, rewards, log_weights, title=None):
         img = imgs[i].squeeze(0)  # now shape (28,28)
         ax.imshow(img, cmap=cmap, norm=norm, interpolation='nearest')
         weight = np.exp(log_weights[i])
-        ax.set_title(f"r={rewards[i]:.3f}\nw={weight:.2f}", fontsize=9)
+        ax.set_title(f"r={rewards[i]:.3f}\nw={weight:.3f}", fontsize=9)
         ax.axis('off')
 
     plt.tight_layout()
@@ -192,13 +192,7 @@ def show_binarized_images_with_rewards(imgs, rewards, log_weights, title=None):
 
 
 def plot_smc_results_binarized_mnist(
-    X_0: torch.LongTensor,
-    W_0: torch.Tensor,
-    ess_trace: np.ndarray,
-    rewards_trace: np.ndarray,
-    particles_trace: list,
-    log_weights_trace: list,
-    resampling_trace: list,
+    result,
     num_timesteps: int,
     vocab_size: int,
     num_categories: int,
@@ -244,6 +238,14 @@ def plot_smc_results_binarized_mnist(
     -------
     None
     """
+    X_0 = result["X_0"]
+    W_0 = result["W_0"]
+    ess_trace = result["ess_trace"]
+    rewards_trace = result["rewards_trace"]
+    particles_trace = result["particles_trace"]
+    log_weights_trace = result["log_weights_trace"]
+    resampling_trace = result["resampling_trace"]
+    
     # Compute sample diversity (# unique particles) at each time step
     diversity_trace = [
         diversity_score_fn(particles_trace[i])
@@ -269,6 +271,8 @@ def plot_smc_results_binarized_mnist(
     ax1.scatter(resampling_trace, np.zeros(len(resampling_trace)), marker='x', color='red', label='Resamples')
     ax1.invert_xaxis()
     ax1.set_ylim(ymin=0)
+    
+    ax1.grid(True)
 
     fig.legend(loc='upper right')
     plt.title('ESS, Diversity, and Mean Reward Over Time')

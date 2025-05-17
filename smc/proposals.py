@@ -44,3 +44,6 @@ def first_order_approximation_optimal_proposal(X_t, x_s_probs, t, lambdas, kl_we
 
 def first_order_approximation_optimal_proposal_with_gradient_clipping(gradient_clip_value):
     return partial(first_order_approximation_optimal_proposal, gradient_clip_value=gradient_clip_value)
+
+def debiasing_guidance(X_t, x_s_probs, t, lambdas, kl_weight, rewards_grad, model, reward_estimate_sample_count, gradient_clip_value=None, beta=1.) -> tuple[Tensor, Tensor]:
+    return first_order_approximation_optimal_proposal(X_t, x_s_probs, t, lambdas, 1/beta, rewards_grad, model, reward_estimate_sample_count, gradient_clip_value=None)
