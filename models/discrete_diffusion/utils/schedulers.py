@@ -47,6 +47,8 @@ class RemaskingScheduler():
             self.eta_cap = kwargs['eta_cap']
         elif schedule == 'rescaled':
             self.eta_rescale = kwargs['eta_rescale']
+        self.t_on = kwargs.pop('t_on', 1.0)
+        self.t_off = kwargs.pop('t_off', 0.0)
             
     def sigma_max(self, alpha_t: Tensor, alpha_s: Tensor) -> Tensor:
         """
@@ -57,19 +59,25 @@ class RemaskingScheduler():
             (1 - alpha_s) / alpha_t,
         )
         
-    def sigma(self, alpha_t: Tensor, alpha_s: Tensor) -> Tensor:
+    def sigma(self, t: Tensor, alpha_t: Tensor, alpha_s: Tensor) -> Tensor:
         """
         Calculates sigma(t)
         """
         if self.schedule == 'max_capped':
-            return torch.min(
+            sigma = torch.min(
                 torch.zeros_like(alpha_t) + self.eta_cap,
                 self.sigma_max(alpha_t, alpha_s)
             )
         elif self.schedule == 'rescaled':
-            return self.eta_rescale * self.sigma_max(alpha_t, alpha_s)
+            sigma = self.eta_rescale * self.sigma_max(alpha_t, alpha_s)
         else:
             raise NotImplementedError
+        sigma = torch.where(
+            (self.t_on >= t) & (t >= self.t_off),
+            sigma,
+            torch.zeros_like(sigma)
+        )
+        return sigma
 
 
 class DiscreteTimeScheduler():

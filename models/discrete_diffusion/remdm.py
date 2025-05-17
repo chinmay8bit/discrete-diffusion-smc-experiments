@@ -21,7 +21,7 @@ class ReMaskingDiffusion(MaskedDiffusion):
         s = self.discrete_time_scheduler.discrete_time(i - 1).to(device)
         alpha_t = self.scheduler.alpha(t)
         alpha_s = self.scheduler.alpha(s)
-        sigma_t = self.remasking_scheduler.sigma(alpha_t, alpha_s)
+        sigma_t = self.remasking_scheduler.sigma(t, alpha_t, alpha_s)
 
         # 1. Calculate x_theta
         x_theta = self.denoising_model(
