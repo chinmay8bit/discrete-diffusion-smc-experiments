@@ -39,6 +39,39 @@ class NoiseScheduler():
             raise NotImplementedError
 
 
+class RemaskingScheduler():
+    def __init__(self, schedule: str, **kwargs):
+        assert schedule in ['max_capped', 'rescaled']
+        self.schedule = schedule
+        if schedule == 'max_capped':
+            self.eta_cap = kwargs['eta_cap']
+        elif schedule == 'rescaled':
+            self.eta_rescale = kwargs['eta_rescale']
+            
+    def sigma_max(self, alpha_t: Tensor, alpha_s: Tensor) -> Tensor:
+        """
+        Calculates the maximum value of sigma
+        """
+        return torch.min(
+            torch.ones_like(alpha_t),
+            (1 - alpha_s) / alpha_t,
+        )
+        
+    def sigma(self, alpha_t: Tensor, alpha_s: Tensor) -> Tensor:
+        """
+        Calculates sigma(t)
+        """
+        if self.schedule == 'max_capped':
+            return torch.min(
+                torch.zeros_like(alpha_t) + self.eta_cap,
+                self.sigma_max(alpha_t, alpha_s)
+            )
+        elif self.schedule == 'rescaled':
+            return self.eta_rescale * self.sigma_max(alpha_t, alpha_s)
+        else:
+            raise NotImplementedError
+
+
 class DiscreteTimeScheduler():
     def __init__(self, schedule: str, num_timesteps: int):
         assert schedule in ['linear', 'cosine']

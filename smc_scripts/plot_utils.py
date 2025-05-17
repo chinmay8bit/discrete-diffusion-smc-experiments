@@ -8,13 +8,7 @@ from scipy.stats import wasserstein_distance_nd as WD
 from smc_scripts.binarized_mnist_utils import binarized_images_diversity, binarized_images_uniqueness_score
 
 def plot_smc_results_checkerboard(
-    X_0: torch.Tensor,
-    W_0: torch.Tensor,
-    ess_trace: np.ndarray,
-    rewards_trace: np.ndarray,
-    particles_trace: list,
-    log_weights_trace: list,
-    resampling_trace: list,
+    result,
     num_timesteps: int,
     vocab_size: int,
     num_categories: int,
@@ -60,6 +54,14 @@ def plot_smc_results_checkerboard(
     -------
     None
     """
+    X_0 = result["X_0"]
+    W_0 = result["W_0"]
+    ess_trace = result["ess_trace"]
+    rewards_trace = result["rewards_trace"]
+    particles_trace = result["particles_trace"]
+    log_weights_trace = result["log_weights_trace"]
+    resampling_trace = result["resampling_trace"]
+    
     if interval is None:
         interval = num_timesteps // 10
     
@@ -199,6 +201,7 @@ def plot_smc_results_binarized_mnist(
     compute_rewards_fn: Callable[[torch.Tensor], torch.Tensor],
     interval: int = 100,
     diversity_score_fn: Callable = binarized_images_diversity,
+    backward_trace=False,
 ) -> None:
     """
     Visualize the progression and diagnostics of a Sequential Monte Carlo (SMC) run.
@@ -245,6 +248,20 @@ def plot_smc_results_binarized_mnist(
     particles_trace = result["particles_trace"]
     log_weights_trace = result["log_weights_trace"]
     resampling_trace = result["resampling_trace"]
+    
+    if backward_trace == True:
+        parent_trace = result["parent_trace"]
+        print("Backward trace is on")
+        new_particles_trace = [particles_trace[-1]]
+        children = np.arange(len(particles_trace[-1])).astype(int)
+        for i in range(len(parent_trace) - 1, -1, -1):
+            parents = parent_trace[i][children]
+            new_particles_trace.append(particles_trace[i][parents])
+            children = parents
+        particles_trace = [
+            new_particles_trace[i]
+            for i in range(len(new_particles_trace) - 1, -1, -1)
+        ]
     
     # Compute sample diversity (# unique particles) at each time step
     diversity_trace = [
