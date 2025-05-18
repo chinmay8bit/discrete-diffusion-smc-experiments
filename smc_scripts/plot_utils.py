@@ -15,7 +15,7 @@ def plot_smc_results_checkerboard(
     compute_rewards_fn: Callable[[torch.Tensor], torch.Tensor],
     interval=None,
     target_samples=None,
-) -> None:
+) -> dict:
     """
     Visualize the progression and diagnostics of a Sequential Monte Carlo (SMC) run.
 
@@ -141,8 +141,15 @@ def plot_smc_results_checkerboard(
     final_diversity = np.unique(samples_final, axis=0).shape[0]
     print(f"Final average reward: {avg_reward:.4f}")
     print(f"Final diversity: {final_diversity}")
+    emd = None
     if target_samples is not None:
-        print(f"EMD: {calculate_EMD(samples_final, target_samples)}")
+        emd = calculate_EMD(samples_final, target_samples)
+        print(f"EMD: {emd}")
+    return {
+        "reward": avg_reward,
+        "diversity": final_diversity,
+        "emd": emd
+    }
   
     
 def calculate_EMD(samples, target_samples):
