@@ -22,7 +22,7 @@ def reverse_as_proposal(X_t, x_s_probs, t, lambdas, kl_weight, rewards_grad, mod
 
 
 def first_order_approximation_optimal_proposal(X_t, x_s_probs, t, lambdas, kl_weight, rewards_grad, model, reward_estimate_sample_count, gradient_clip_value=None) -> tuple[Tensor, Tensor]:
-    # Normalizing rewards_grad does not change the resulting probability distribution
+    # Centering rewards_grad does not change the resulting probability distribution
     rewards_grad = rewards_grad - rewards_grad.mean(dim=-1, keepdim=True)
     
     if gradient_clip_value is not None:
