@@ -209,7 +209,7 @@ def plot_smc_results_binarized_mnist(
     interval: int = 100,
     diversity_score_fn: Callable = binarized_images_diversity,
     backward_trace=False,
-) -> None:
+) -> dict:
     """
     Visualize the progression and diagnostics of a Sequential Monte Carlo (SMC) run.
 
@@ -346,3 +346,8 @@ def plot_smc_results_binarized_mnist(
     print(f"Final average reward: {avg_reward:.4f}")
     print(f"Final diversity score: {final_diversity:.2f}")
     print(f"Final uniqueness: {final_uniqueness}")
+    return {
+        "reward": avg_reward,
+        "diversity": final_diversity,
+        "uniqueness": final_uniqueness,
+    }
