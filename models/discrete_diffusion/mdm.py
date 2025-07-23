@@ -104,3 +104,53 @@ class MaskedDiffusion(nn.Module):
         assert torch.all(p_theta >= 0), f"Min = {p_theta.min()}, {t}"
         assert torch.all(x_theta >= 0), f"Min = {x_theta.min()}, {t}"
         return p_theta, x_theta
+    
+    def sample_till(self, step, num_samples: int = 1, device=torch.device('cpu')) -> Tensor:
+        N = self.num_categories
+        z_t = torch.full((num_samples, *self.input_shape), self.mask_index, device=device)
+        B = z_t.shape[0]
+        z_t = z_t.reshape(B, -1) # Shape: (B, L)
+        
+        for i in range(self.num_timesteps, step, -1):
+            p_theta, _ = self.sample_step(F.one_hot(z_t, num_classes=N).float(), i, device)
+            
+            # Sample z_s from p_theta
+            z_s = torch.distributions.Categorical(probs=p_theta).sample() # Shape: (B, L)
+            
+            z_t = z_s
+        
+        x = z_t.reshape(B, *self.input_shape)
+        return x
+    
+    def get_z_t_from_x(self, x, t):
+        B = x.shape[0]
+        N = self.num_categories
+        x = x.reshape(B, -1)
+        L = x.shape[-1]
+        
+        t = t if torch.is_tensor(t) else torch.full((B,), t, device=x.device)
+        
+        alpha = self.scheduler.alpha(t) # Shape: (B)
+        
+        # Sample z_t from q(z_t | x)
+        x = F.one_hot(x, num_classes=N) # Shape: (B, L, N)
+        m = F.one_hot(torch.full((B, L), self.mask_index, device=x.device), num_classes=N) # Shape: (B, L, N)
+        q = torch.distributions.Categorical(
+            probs=alpha.view(B, 1, 1) * x  + (1 - alpha).view(B, 1, 1) * m
+        )
+        z_t = q.sample() # Shape: (B, L)
+        return z_t.reshape(B, *self.input_shape)
+    
+    def get_x_theta_from_z_t(self, z_t, t):
+        B = z_t.shape[0]
+        N = self.num_categories
+        
+        z_t = F.one_hot(z_t, num_classes=N).float()
+        
+        # Calculate x_theta
+        x_theta = self.denoising_model(
+            z_t, 
+            torch.full((B,), t, device=z_t.device)
+        )
+        return x_theta
+    
