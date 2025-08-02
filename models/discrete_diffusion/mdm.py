@@ -145,12 +145,10 @@ class MaskedDiffusion(nn.Module):
         B = z_t.shape[0]
         N = self.num_categories
         
+        t = t if torch.is_tensor(t) else torch.full((B,), t, device=z_t.device)
         z_t = F.one_hot(z_t, num_classes=N).float()
         
         # Calculate x_theta
-        x_theta = self.denoising_model(
-            z_t, 
-            torch.full((B,), t, device=z_t.device)
-        )
+        x_theta = self.denoising_model(z_t, t)
         return x_theta
     
