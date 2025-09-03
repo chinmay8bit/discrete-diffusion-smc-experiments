@@ -23,7 +23,9 @@ def sequential_monte_carlo(
     compute_reward_fn,
     lambdas,
     kl_weight,
-    reward_estimate_sample_count: int,
+    reward_estimate: str = "MC estimate",
+    reward_estimate_sample_count: Optional[int] = None,
+    compute_reward_from_probs = None,
     use_partial_resampling: bool = False,
     partial_resample_size: Optional[int] = None,
     perform_final_resample=True,
@@ -43,7 +45,7 @@ def sequential_monte_carlo(
         resample_fn (function): Resampling function.
         proposal_fn (function): Generates new particles using some proposal
         lambdas (list): List of lambda values.
-        reward_estimate (str): argmax/sampling/mean
+        reward_estimate (str): exact/MC estimate
         reward_estimate_sample_count (int): only applicable if reward_estimate = sampling
 
     Returns:
@@ -74,15 +76,20 @@ def sequential_monte_carlo(
         z_t = F.one_hot(X_t.reshape(N, -1), num_classes=num_categories).float()
         z_t.requires_grad_()
         x_s_probs, x0_probs = model.sample_step(z_t, t, device=device) # Shape: N, L, num_categories
-        x0_samples = F.gumbel_softmax(
-            logits=torch.log(x0_probs + eps).unsqueeze(1).expand(-1, reward_estimate_sample_count, -1, -1),
-            hard=True,
-        ) # Shape: N, reward_estimate_sample_count, L, num_categories
-        rewards = compute_reward_fn(
-            x0_samples.reshape(N * reward_estimate_sample_count, *input_shape, num_categories),
-            with_grad=True,
-        ).reshape(N, reward_estimate_sample_count)
-        rewards = rewards.mean(dim=1) # Shape: N
+        if reward_estimate == "exact":
+            assert compute_reward_from_probs is not None, "compute_reward_from_probs must be specified for exact reward"
+            rewards = compute_reward_from_probs(x0_probs)
+        else:
+            assert reward_estimate_sample_count is not None, "reward_estimate_sample_count must be specified for MC estimate"
+            x0_samples = F.gumbel_softmax(
+                logits=torch.log(x0_probs + eps).unsqueeze(1).expand(-1, reward_estimate_sample_count, -1, -1),
+                hard=True,
+            ) # Shape: N, reward_estimate_sample_count, L, num_categories
+            rewards = compute_reward_fn(
+                x0_samples.reshape(N * reward_estimate_sample_count, *input_shape, num_categories),
+                with_grad=True,
+            ).reshape(N, reward_estimate_sample_count)
+            rewards = rewards.mean(dim=1) # Shape: N
         rewards_grad = torch.autograd.grad(outputs=rewards, inputs=z_t, grad_outputs=torch.ones_like(rewards))[0]
         
         # After computing gradients, detach and other tensors if needed
