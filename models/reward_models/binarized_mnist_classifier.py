@@ -2,6 +2,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+"""
+This takes one hot input.
+"""
 class BinarizedMNISTClassifier(nn.Module):
     def __init__(self):
         super(BinarizedMNISTClassifier, self).__init__()
@@ -21,6 +24,50 @@ class BinarizedMNISTClassifier(nn.Module):
         """
         x = x @ self.embedding.weight # Shape: (B, 1, 28, 28, 16)
         x = x.transpose(1, -1).squeeze(-1) # Shape: (B, 16, 28, 28)
+        x = F.relu(self.conv1(x))
+        x = F.relu(self.conv2(x))
+        x = self.pool1(x)
+        x = F.relu(self.conv3(x))
+        x = F.relu(self.conv4(x))
+        x = self.pool2(x)
+        x = x.flatten(start_dim=1) # Flatten
+        x = F.relu(self.fc1(x))
+        x = self.fc2(x)
+        return x  # Shape: (B, 10)
+   
+"""
+This takes float input.
+"""
+class BinarizedMNISTClassifierExt(nn.Module):
+    def __init__(self):
+        super(BinarizedMNISTClassifierExt, self).__init__()
+        self.conv1 = nn.Conv2d(1, 16, kernel_size=3)   # Output: (B, 16, 26, 26)
+        self.conv2 = nn.Conv2d(16, 32, kernel_size=3)   # Output: (B, 32, 24, 24)
+        self.pool1 = nn.MaxPool2d(2, 2)                 # Output: (B, 32, 12, 12)
+        self.conv3 = nn.Conv2d(32, 64, kernel_size=3)  # Output: (B, 64, 10, 10)
+        self.conv4 = nn.Conv2d(64, 128, kernel_size=3) # Output: (B, 128, 8, 8)
+        self.pool2 = nn.MaxPool2d(2, 2)                 # Output: (B, 128, 4, 4)
+        self.fc1 = nn.Linear(128 * 4 * 4, 64)
+        self.fc2 = nn.Linear(64, 10)
+        
+    def get_embeddings(self, x):
+        """
+        x.shape: (B, 1, 28, 28)
+        """
+        x = F.relu(self.conv1(x))
+        x = F.relu(self.conv2(x))
+        x = self.pool1(x)
+        x = F.relu(self.conv3(x))
+        x = F.relu(self.conv4(x))
+        x = self.pool2(x)
+        x = x.flatten(start_dim=1) # Flatten
+        # x = self.fc1(x)
+        return x  # Shape: (B, 64)
+
+    def forward(self, x):
+        """
+        x.shape: (B, 1, 28, 28)
+        """
         x = F.relu(self.conv1(x))
         x = F.relu(self.conv2(x))
         x = self.pool1(x)
