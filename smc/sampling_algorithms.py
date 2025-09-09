@@ -24,7 +24,7 @@ def systematic_resample(log_weights: Tensor, normalized=True):
     u = u0 + torch.arange(N, dtype=torch.float32, device=log_weights.device) / N
 
     indices = torch.searchsorted(cdf, u, right=True)
-    return indices
+    return indices.clamp_max(N-1) # edge case when u0 is very close to 1/N
 
 def multinomial_resample(log_weights: Tensor, normalized=True):
     N = log_weights.shape[0]

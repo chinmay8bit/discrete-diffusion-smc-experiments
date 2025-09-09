@@ -78,7 +78,7 @@ class UniformDiffusion(nn.Module):
         loss = (weight / N) * (loss_term_1 + loss_term_2) # Shape: (B)
         return loss.mean(dim=0)
     
-    def sample(self, num_samples: int = 1, device='cpu') -> Tensor:
+    def sample(self, num_samples: int = 1, device=torch.device('cpu')) -> Tensor:
         N = self.num_categories
         z_t = torch.randint(0, N, (num_samples, *self.input_shape), device=device)
         B = z_t.shape[0]
@@ -96,7 +96,7 @@ class UniformDiffusion(nn.Module):
         x = z_t.reshape(B, *self.input_shape)
         return x
     
-    def sample_step(self, z_t: Tensor, i: int, device='cpu') -> tuple[Tensor, Tensor]:
+    def sample_step(self, z_t: Tensor, i: int, device=torch.device('cpu')) -> tuple[Tensor, Tensor]:
         B, L, N = z_t.shape
         
         t = self.discrete_time_scheduler.discrete_time(i).to(device)
@@ -107,7 +107,7 @@ class UniformDiffusion(nn.Module):
         # 1. Calculate x_theta
         x_theta: Tensor = self.denoising_model(
             z_t.reshape(B, *self.input_shape, N), 
-            torch.full((B,), t, device=device)
+            torch.full((B,), t.item(), device=device)
         )
         x_theta = x_theta.reshape(B, L, N)
         
